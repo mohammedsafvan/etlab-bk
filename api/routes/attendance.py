@@ -1,5 +1,5 @@
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 from fastapi import APIRouter, status
 
 from api.deps import TokenDep
@@ -30,11 +30,12 @@ async def get_attendance(token: TokenDep, current_semester: int):
 
         headings = []
         contents = []
-        for th in table.find_all("tr")[0].find_all("th"):
-            headings.append(th.text.strip())
+        if table and isinstance(table, Tag):
+            for th in table.find_all("tr")[0].find_all("th"):
+                headings.append(th.text.strip())
 
-        for td in table.find_all("tr")[1].find_all("td"):
-            contents.append(td.text.strip())
+            for td in table.find_all("tr")[1].find_all("td"):
+                contents.append(td.text.strip())
 
         uni_reg_no = contents[0]
         roll_no = contents[1]
