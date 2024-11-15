@@ -1,18 +1,22 @@
-from fastapi import APIRouter, status
-from config import Config
-from models import LoginCreds
-from bs4 import BeautifulSoup
+from typing import Annotated
+
 import requests
+from bs4 import BeautifulSoup
+from fastapi import APIRouter, Depends, status
+from fastapi.security import OAuth2PasswordRequestForm
+
+from config import Config
+from models import Token
 
 router = APIRouter()
 session = requests.Session()
 
 
 @router.post("/login")
-async def login(creds: LoginCreds):
+async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
     payload = {
-        "LoginForm[username]": creds.username,
-        "LoginForm[password]": creds.password,
+        "LoginForm[username]": form_data.username,
+        "LoginForm[password]": form_data.password,
         "yt0": "",
     }
 
@@ -21,17 +25,23 @@ async def login(creds: LoginCreds):
         "Content-Type": "application/x-www-form-urlencoded",
     }
 
-    response = session.post(
-        f"{Config.BASE_URL}/user/login", data=payload, headers=headers
-    )
+    try:
+        response = session.post(
+            f"{Config.BASE_URL}/user/login", data=payload, headers=headers
+        )
 
-    parsed_response = BeautifulSoup(response.text, "html.parser")
-    title = parsed_response.title.text.lower()  # type: ignore
-    if "login" in title:
+        parsed_response = BeautifulSoup(response.text, "html.parser")
+        title = parsed_response.title.text.lower()  # type: ignore
+        if "login" in title:
+            return {
+                "status_code": status.HTTP_401_UNAUTHORIZED,
+                "message": "Invalid Credentials",
+            }
+
+        auth_token = session.cookies.get_dict()[Config.COOKIE_KEY]
+        return Token(access_token=auth_token)
+    except Exception as e:
         return {
-            "status_code": status.HTTP_401_UNAUTHORIZED,
-            "message": "Invalid Credentials",
+            "status_code": status.HTTP_400_BAD_REQUEST,
+            "message": f"An error occurred: {e}",
         }
-
-    auth_token = session.cookies.get_dict()[Config.COOKIE_KEY]
-    return {"status_code": status.HTTP_200_OK, "auth_token": auth_token}
