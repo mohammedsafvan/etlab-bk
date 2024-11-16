@@ -1,4 +1,4 @@
-import requests
+import httpx
 from bs4 import BeautifulSoup, Tag
 from fastapi import APIRouter, status
 
@@ -19,28 +19,25 @@ async def get_attendance(token: TokenDep, current_semester: int):
     cookies = {Config.COOKIE_KEY: token}
 
     try:
-        response = requests.get(
-            f"{Config.BASE_URL}/ktuacademics/student/viewattendancesubject/{current_semester}",
-            headers=headers,
-            cookies=cookies,
-        )
+        async with httpx.AsyncClient() as session:
+            response = await session.get(
+                f"{Config.BASE_URL}/ktuacademics/student/viewattendancesubject/{current_semester}",
+                headers=headers,
+                cookies=cookies,
+            )
         soup = BeautifulSoup(response.text, "html.parser")
-
         table = soup.find("table")
+        if not table or not isinstance(table, Tag):
+            return {
+                "status_code": status.HTTP_400_BAD_REQUEST,
+                "message": "No attendance found",
+            }
 
-        headings = []
-        contents = []
-        if table and isinstance(table, Tag):
-            for th in table.find_all("tr")[0].find_all("th"):
-                headings.append(th.text.strip())
+        headings = [th.text.strip() for th in table.find_all("tr")[0].find_all("th")]
+        contents = [td.text.strip() for td in table.find_all("tr")[1].find_all("td")]
 
-            for td in table.find_all("tr")[1].find_all("td"):
-                contents.append(td.text.strip())
-
-        uni_reg_no = contents[0]
-        roll_no = contents[1]
-        name = contents[2]
-        [attended, total] = contents[-2].split("/")
+        uni_reg_no, roll_no, name = contents[:3]
+        attended, total = contents[-2].split("/")
         total_percentage = contents[-1]
         attendance_dict = {}
 
@@ -69,4 +66,3 @@ async def get_attendance(token: TokenDep, current_semester: int):
             "status_code": status.HTTP_400_BAD_REQUEST,
             "message": f"An error occurred: {e}",
         }
-        pass

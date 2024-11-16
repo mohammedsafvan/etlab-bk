@@ -38,8 +38,15 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
                 "message": "Invalid Credentials",
             }
 
-        auth_token = session.cookies.get_dict()[Config.COOKIE_KEY]
-        return Token(access_token=auth_token)
+        auth_token = session.cookies.get(Config.COOKIE_KEY)
+        return (
+            Token(access_token=auth_token)
+            if auth_token
+            else {
+                "status_code": status.HTTP_401_UNAUTHORIZED,
+                "message": "Invalid Credentials",
+            }
+        )
     except Exception as e:
         return {
             "status_code": status.HTTP_400_BAD_REQUEST,

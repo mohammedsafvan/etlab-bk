@@ -1,4 +1,4 @@
-import requests
+import httpx
 from bs4 import BeautifulSoup, Tag
 from fastapi import APIRouter, status
 
@@ -21,7 +21,7 @@ def get_text_from_soup(soup: BeautifulSoup, string):
 def get_img_url(soup: BeautifulSoup):
     img_element = soup.find("img", id="photo")
     if img_element and isinstance(img_element, Tag):
-        return f"{Config.BASE_URL}/{img_element.attrs['src']}"
+        return f"{Config.BASE_URL}{img_element.attrs['src']}"
     return None
 
 
@@ -32,12 +32,13 @@ async def get_info(token: TokenDep):
     }
     cookies = {Config.COOKIE_KEY: token}
     try:
-        response = requests.get(
-            f"{Config.BASE_URL}/student/profile", headers=headers, cookies=cookies
-        )
-
-        soup = BeautifulSoup(response.text, "html.parser")
-
+        async with httpx.AsyncClient() as session:
+            response = await session.get(
+                f"{Config.BASE_URL}/student/profile", headers=headers, cookies=cookies
+            )
+            print(response.text)
+            soup = BeautifulSoup(response.text, "html.parser")
+            print(soup)
         name = get_text_from_soup(soup, "Name")
         dob = get_text_from_soup(soup, "Date of Birth")
         ad_no = get_text_from_soup(soup, "Admission No")
